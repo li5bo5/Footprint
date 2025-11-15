@@ -1,0 +1,71 @@
+<resources>
+    <string name="app_name">足迹 Footprint</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">概览</string>
+    <string name="nav_map">地图</string>
+    <string name="nav_timeline">足迹簿</string>
+    <string name="nav_planner">目标</string>
+
+    <!-- Common Actions -->
+    <string name="action_add">添加</string>
+    <string name="action_save">保存</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_delete">删除</string>
+    <string name="action_edit">编辑</string>
+    <string name="action_search">搜索</string>
+    <string name="action_filter">筛选</string>
+
+    <!-- Footprint Entry -->
+    <string name="footprint_title">标题</string>
+    <string name="footprint_location">位置</string>
+    <string name="footprint_date">日期</string>
+    <string name="footprint_mood">心情</string>
+    <string name="footprint_tags">标签</string>
+    <string name="footprint_distance">距离</string>
+    <string name="footprint_energy">体力</string>
+    <string name="footprint_notes">备注</string>
+    <string name="add_footprint">记录足迹</string>
+
+    <!-- Map Screen -->
+    <string name="map_current_location">当前位置</string>
+    <string name="map_start_point">起点</string>
+    <string name="map_tracking">追踪中…</string>
+    <string name="map_start_tracking">点击开始追踪</string>
+    <string name="map_stop_tracking">停止追踪</string>
+    <string name="map_location_points">位置点</string>
+    <string name="map_total_distance">总距离</string>
+    <string name="map_accuracy">精度: %d米</string>
+
+    <!-- Permissions -->
+    <string name="permission_location_required">需要位置权限</string>
+    <string name="permission_location_description">为了追踪您的足迹，需要访问设备位置</string>
+    <string name="permission_grant">授予权限</string>
+
+    <!-- Distance Format -->
+    <string name="distance_meters">%d 米</string>
+    <string name="distance_kilometers">%.2f 公里</string>
+
+    <!-- Goals -->
+    <string name="goal_title">目标标题</string>
+    <string name="goal_location">目标地点</string>
+    <string name="goal_date">目标日期</string>
+    <string name="goal_notes">备注</string>
+    <string name="add_goal">添加目标</string>
+
+    <!-- Stats -->
+    <string name="stats_total_entries">总记录</string>
+    <string name="stats_total_distance">总距离</string>
+    <string name="stats_unique_places">独特地点</string>
+    <string name="stats_average_energy">平均体力</string>
+
+    <!-- Validation -->
+    <string name="validation_title_required">请输入标题</string>
+    <string name="validation_location_required">请输入位置</string>
+    <string name="validation_invalid_distance">距离必须大于0</string>
+
+    <!-- Error Messages -->
+    <string name="error_load_failed">加载失败，请重试</string>
+    <string name="error_save_failed">保存失败，请重试</string>
+    <string name="error_location_unavailable">位置服务不可用</string>
+</resources>
