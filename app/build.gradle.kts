@@ -22,8 +22,8 @@ android {
         applicationId = "com.footprint"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 5
+        versionName = "1.4.0"
 
         manifestPlaceholders["AMAP_KEY"] = localProperties.getProperty("AMAP_KEY") ?: "YOUR_AMAP_API_KEY"
 
@@ -41,8 +41,9 @@ android {
             )
         }
         debug {
-            applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
+            // 移除后缀，确保包名与高德后台配置 ("com.footprint") 一致
+            // applicationIdSuffix = ".debug"
+            // versionNameSuffix = "-debug"
         }
     }
 
@@ -106,10 +107,13 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.1.0")
 
     // AMap (高德地图) SDK
-    // 3D地图 SDK (通常已内置定位核心类，避免重复引用)
     implementation("com.amap.api:3dmap:latest.integration")
-    // 如果 3dmap 不包含完整定位功能，可以使用以下方式引入但排除冲突，但通常只留 3dmap 即可
-    // implementation("com.amap.api:location:latest.integration") 
+
+    // JSON Parsing
+    implementation("com.google.code.gson:gson:2.10.1")
+
+    // Coil (Image Loading)
+    implementation("io.coil-kt:coil-compose:2.5.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

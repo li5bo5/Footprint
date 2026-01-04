@@ -1,28 +1,33 @@
 package com.footprint.ui.screens
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.QueryStats
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.footprint.data.model.FootprintSummary
 import com.footprint.data.model.TravelGoal
+import com.footprint.ui.components.AppBackground
+import com.footprint.ui.components.GlassMorphicCard
 import java.time.format.DateTimeFormatter
+
+import com.footprint.ui.components.SwipeableItem
 
 @Composable
 fun GoalPlannerScreen(
@@ -30,51 +35,95 @@ fun GoalPlannerScreen(
     goals: List<TravelGoal>,
     summary: FootprintSummary,
     onToggleGoal: (TravelGoal) -> Unit,
-    onAddGoal: () -> Unit
+    onAddGoal: () -> Unit,
+    onEditGoal: (TravelGoal) -> Unit,
+    onDeleteGoal: (TravelGoal) -> Unit
 ) {
     val formatter = DateTimeFormatter.ofPattern("yyyy/MM/dd")
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Text(text = "目标驾驶舱", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            PlannerCard(modifier = Modifier.weight(1f), title = "年度打卡", value = "${summary.yearly.totalEntries} 次")
-            PlannerCard(modifier = Modifier.weight(1f), title = "活跃天数", value = summary.daysActiveThisYear.toString())
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            PlannerCard(modifier = Modifier.weight(1f), title = "连续记录", value = "${summary.streakDays} 天")
-            PlannerCard(modifier = Modifier.weight(1f), title = "本月能量", value = summary.monthly.energyAverage.takeIf { it > 0 }?.toInt()?.toString() ?: "-" )
-        }
-
-        Button(onClick = onAddGoal) { Text("添加目标") }
-
-        goals.forEach { goal ->
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    
+    AppBackground(modifier = modifier) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // 仿 Telegram 沉浸式顶部
+            Surface(
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(text = goal.title, style = MaterialTheme.typography.titleMedium)
-                        Checkbox(checked = goal.isCompleted, onCheckedChange = { onToggleGoal(goal) })
+                Row(
+                    modifier = Modifier
+                        .statusBarsPadding()
+                        .padding(16.dp)
+                        .fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            text = "计划与目标",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "完成进度: ${goals.count { it.isCompleted }}/${goals.size}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
-                    Text(text = "目的地：${goal.targetLocation}", style = MaterialTheme.typography.bodyMedium)
-                    Text(text = "预计：${goal.targetDate.format(formatter)}", style = MaterialTheme.typography.labelMedium)
-                    Text(text = goal.notes, style = MaterialTheme.typography.bodySmall)
-                    LinearProgressIndicator(
-                        progress = { goal.progress.coerceIn(0, 100) / 100f },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 12.dp),
+                    
+                    SmallFloatingActionButton(
+                        onClick = onAddGoal,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = Color.White,
+                        shape = CircleShape
+                    ) {
+                        Icon(Icons.Default.Add, null)
+                    }
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp, bottom = 100.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 概览摘要卡片
+                item {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(20.dp),
+                            horizontalArrangement = Arrangement.SpaceAround
+                        ) {
+                            PlannerStatItem("年度记录", "${summary.yearly.totalEntries}", Icons.Default.QueryStats)
+                            PlannerStatItem("活跃天数", "${summary.daysActiveThisYear}", Icons.Default.Flag)
+                            PlannerStatItem("连续天数", "${summary.streakDays}", Icons.Default.Check)
+                        }
+                    }
+                }
+
+                item {
+                    Text(
+                        "进行中",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 4.dp, top = 8.dp)
                     )
+                }
+
+                items(goals) { goal ->
+                    SwipeableItem(
+                        onEdit = { onEditGoal(goal) },
+                        onDelete = { onDeleteGoal(goal) }
+                    ) {
+                        TelegramGoalItem(
+                            goal = goal,
+                            formatter = formatter,
+                            onToggle = { onToggleGoal(goal) },
+                            onEdit = { onEditGoal(goal) }
+                        )
+                    }
                 }
             }
         }
@@ -82,14 +131,90 @@ fun GoalPlannerScreen(
 }
 
 @Composable
-private fun PlannerCard(modifier: Modifier = Modifier, title: String, value: String) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+private fun PlannerStatItem(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+        Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun TelegramGoalItem(
+    goal: TravelGoal,
+    formatter: DateTimeFormatter,
+    onToggle: () -> Unit,
+    onEdit: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onEdit() }
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = title, style = MaterialTheme.typography.labelLarge)
-            Text(text = value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            // 自定义 Checkbox 效果
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(if (goal.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                if (goal.isCompleted) Icons.Default.Check else com.footprint.ui.components.IconUtils.getIconByName(goal.icon),
+                null,
+                tint = if (goal.isCompleted) Color.White else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = goal.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (goal.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "目的地: ${goal.targetLocation}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "预计: ${goal.targetDate.format(formatter)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                if (goal.notes.isNotBlank()) {
+                    Text(
+                        text = goal.notes,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp),
+                        maxLines = 2,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+
+                // 进度条
+                Spacer(modifier = Modifier.height(12.dp))
+                LinearProgressIndicator(
+                    progress = { goal.progress / 100f },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(CircleShape),
+                    color = if (goal.isCompleted) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
         }
     }
 }

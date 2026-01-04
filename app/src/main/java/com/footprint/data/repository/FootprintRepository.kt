@@ -13,10 +13,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.ZoneOffset
 
 class FootprintRepository(
     private val footprintDao: FootprintDao,
     private val travelGoalDao: TravelGoalDao,
+    private val trackPointDao: com.footprint.data.local.TrackPointDao,
+    private val preferenceManager: com.footprint.utils.PreferenceManager
 ) {
 
     private val ioScope = CoroutineScope(Dispatchers.IO)
@@ -26,6 +29,55 @@ class FootprintRepository(
 
     fun observeGoals(): Flow<List<TravelGoal>> =
         travelGoalDao.observeGoals().map { list -> list.map { it.toModel() } }
+
+    // --- Tracking ---
+    suspend fun saveTrackPoint(location: com.amap.api.location.AMapLocation) {
+        val entity = com.footprint.data.local.TrackPointEntity(
+            latitude = location.latitude,
+            longitude = location.longitude,
+            timestamp = location.time,
+            speed = location.speed,
+            accuracy = location.accuracy,
+            altitude = location.altitude
+        )
+        trackPointDao.insert(entity)
+    }
+
+    fun getTrackPoints(startTime: Long, endTime: Long): Flow<List<com.footprint.data.local.TrackPointEntity>> {
+        return trackPointDao.getPointsInRange(startTime, endTime)
+    }
+
+    suspend fun getTrackPointCount(year: Int, month: Int? = null): Int {
+        val start = if (month == null) {
+            LocalDate.of(year, 1, 1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+        } else {
+            LocalDate.of(year, month, 1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+        }
+        
+        val end = if (month == null) {
+            LocalDate.of(year, 12, 31).atTime(23, 59, 59).toInstant(ZoneOffset.UTC).toEpochMilli()
+        } else {
+            val lastDay = LocalDate.of(year, month, 1).lengthOfMonth()
+            LocalDate.of(year, month, lastDay).atTime(23, 59, 59).toInstant(ZoneOffset.UTC).toEpochMilli()
+        }
+        
+        return trackPointDao.getCountInRange(start, end)
+    }
+
+    suspend fun prepareBackup(): com.footprint.data.model.BackupData {
+        return com.footprint.data.model.BackupData(
+            footprints = footprintDao.getAll(),
+            goals = travelGoalDao.getAll(),
+            trackPoints = trackPointDao.getAll()
+        )
+    }
+
+    suspend fun restoreFromBackup(data: com.footprint.data.model.BackupData) {
+        if (data.footprints.isNotEmpty()) footprintDao.upsertAll(data.footprints)
+        if (data.goals.isNotEmpty()) travelGoalDao.upsertAll(data.goals)
+        if (data.trackPoints.isNotEmpty()) trackPointDao.insertAll(data.trackPoints)
+    }
+    // ----------------
 
     suspend fun saveEntry(entry: FootprintEntry) {
         footprintDao.upsert(entry.toEntity())
@@ -37,17 +89,22 @@ class FootprintRepository(
         travelGoalDao.upsert(goal.toEntity())
     }
 
+    suspend fun deleteGoal(id: Long) = travelGoalDao.deleteById(id)
+
     suspend fun updateGoalCompletion(goal: TravelGoal, completed: Boolean) {
         travelGoalDao.upsert(goal.copy(isCompleted = completed).toEntity())
     }
 
     fun ensureSeedData() {
         ioScope.launch {
-            if (footprintDao.count() == 0) {
-                SeedData.entries.forEach { footprintDao.upsert(it) }
-            }
-            if (travelGoalDao.count() == 0) {
-                SeedData.goals.forEach { travelGoalDao.upsert(it) }
+            if (!preferenceManager.hasSeededV5) {
+                if (footprintDao.count() == 0) {
+                    SeedData.entries.forEach { footprintDao.upsert(it) }
+                }
+                if (travelGoalDao.count() == 0) {
+                    SeedData.goals.forEach { travelGoalDao.upsert(it) }
+                }
+                preferenceManager.hasSeededV5 = true
             }
         }
     }
@@ -63,11 +120,14 @@ class FootprintRepository(
         photos = photos,
         energyLevel = energyLevel,
         happenedOn = happenedOn,
+        latitude = latitude,
+        longitude = longitude,
         altitude = altitude,
         weather = weather,
         temperature = temperature,
-        transportType = com.footprint.data.model.TransportType.valueOf(transportType),
-        carbonSavedKg = carbonSaved
+        transportType = try { com.footprint.data.model.TransportType.valueOf(transportType) } catch (e: Exception) { com.footprint.data.model.TransportType.UNKNOWN },
+        carbonSavedKg = carbonSaved,
+        icon = icon
     )
 
     private fun FootprintEntry.toEntity() = FootprintEntity(
@@ -81,11 +141,14 @@ class FootprintRepository(
         photos = photos,
         energyLevel = energyLevel,
         happenedOn = happenedOn,
+        latitude = latitude,
+        longitude = longitude,
         altitude = altitude,
         weather = weather,
         temperature = temperature,
         transportType = transportType.name,
-        carbonSaved = carbonSavedKg
+        carbonSaved = carbonSavedKg,
+        icon = icon
     )
 
     private fun TravelGoalEntity.toModel() = TravelGoal(
@@ -95,7 +158,8 @@ class FootprintRepository(
         targetDate = targetDate,
         notes = notes,
         isCompleted = isCompleted,
-        progress = progress
+        progress = progress,
+        icon = icon
     )
 
     private fun TravelGoal.toEntity() = TravelGoalEntity(
@@ -105,7 +169,8 @@ class FootprintRepository(
         targetDate = targetDate,
         notes = notes,
         isCompleted = isCompleted,
-        progress = progress
+        progress = progress,
+        icon = icon
     )
 }
 
@@ -120,7 +185,9 @@ private object SeedData {
             distanceKm = 18.4,
             photos = emptyList(),
             energyLevel = 8,
-            happenedOn = LocalDate.now().minusDays(12)
+            happenedOn = LocalDate.now().minusDays(12),
+            latitude = 31.1,
+            longitude = 102.9
         ),
         FootprintEntity(
             title = "魔都城市夜跑",
@@ -131,7 +198,9 @@ private object SeedData {
             distanceKm = 21.0,
             photos = emptyList(),
             energyLevel = 7,
-            happenedOn = LocalDate.now().minusDays(25)
+            happenedOn = LocalDate.now().minusDays(25),
+            latitude = 31.23,
+            longitude = 121.47
         ),
         FootprintEntity(
             title = "厦门海岸线骑行",
@@ -142,7 +211,9 @@ private object SeedData {
             distanceKm = 32.5,
             photos = emptyList(),
             energyLevel = 6,
-            happenedOn = LocalDate.now().minusDays(37)
+            happenedOn = LocalDate.now().minusDays(37),
+            latitude = 24.47,
+            longitude = 118.1
         )
     )
 

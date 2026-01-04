@@ -29,21 +29,43 @@ private val DarkColors = darkColorScheme(
     onSecondary = Color.Black,
     tertiary = AccentTeal,
     surface = SurfaceDark,
-    onSurface = Color.White
+    onSurface = Color.White,
+    background = Color(0xFF0D1117),
+    onBackground = Color.White
 )
 
 enum class AppThemeStyle {
-    CLASSIC, CYBERPUNK, FOREST, SAHARA
+    CLASSIC, CYBERPUNK, FOREST, SAHARA, AUTO
+}
+
+enum class ThemeMode {
+    SYSTEM, LIGHT, DARK
 }
 
 @Composable
 fun FootprintTheme(
     style: AppThemeStyle = AppThemeStyle.CLASSIC,
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    dominantMood: com.footprint.data.model.Mood? = null,
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when (style) {
+    val darkTheme = when (themeMode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
+
+    val effectiveStyle = if (style == AppThemeStyle.AUTO) {
+        when (dominantMood?.label) {
+            "开心", "兴奋" -> AppThemeStyle.CYBERPUNK
+            "平静", "放松" -> AppThemeStyle.FOREST
+            "难过", "疲惫" -> AppThemeStyle.SAHARA
+            else -> AppThemeStyle.CLASSIC
+        }
+    } else style
+
+    val colorScheme = when (effectiveStyle) {
         AppThemeStyle.CYBERPUNK -> if (darkTheme) CyberpunkDarkColors else CyberpunkLightColors
         AppThemeStyle.FOREST -> ForestColors
         AppThemeStyle.SAHARA -> SaharaColors

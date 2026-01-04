@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class LocationTrackingService : Service(), AMapLocationListener {
 
     private var locationClient: AMapLocationClient? = null
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     
     companion object {
         const val NOTIFICATION_ID = 1001
@@ -57,6 +58,25 @@ class LocationTrackingService : Service(), AMapLocationListener {
     override fun onCreate() {
         super.onCreate()
         initLocationClient()
+        
+        serviceScope.launch {
+            val app = applicationContext as com.footprint.FootprintApplication
+            val startOfDay = java.time.LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            
+            app.repository.getTrackPoints(startOfDay, Long.MAX_VALUE).collect { points ->
+                val locations = points.map { entity ->
+                    AMapLocation("gps").apply {
+                        latitude = entity.latitude
+                        longitude = entity.longitude
+                        speed = entity.speed
+                        accuracy = entity.accuracy
+                        altitude = entity.altitude
+                        time = entity.timestamp
+                    }
+                }
+                _sharedTrackingPath.value = locations
+            }
+        }
     }
 
     private fun initLocationClient() {
@@ -105,14 +125,36 @@ class LocationTrackingService : Service(), AMapLocationListener {
                 if (location.latitude > 1.0 && location.longitude > 1.0) {
                     _sharedCurrentLocation.value = location
                     if (_sharedIsTracking.value) {
-                        val path = _sharedTrackingPath.value.toMutableList()
-                        path.add(location)
-                        _sharedTrackingPath.value = path
+                        // 2. 持久化存储 (DB) - UI会在Flow收集器中自动更新
+                        serviceScope.launch {
+                            try {
+                                val app = applicationContext as com.footprint.FootprintApplication
+                                app.repository.saveTrackPoint(location)
+                            } catch (e: Exception) {
+                                Log.e("FootprintLoc", "Failed to save point: ${e.message}")
+                            }
+                        }
                     }
                     Log.d("FootprintLoc", "坐标获取成功: ${location.latitude}, ${location.longitude}")
                 }
             } else {
-                Log.e("FootprintLoc", "定位错误: ${location.errorCode} - ${location.errorInfo}")
+                val errText = "定位错误: ${location.errorCode} - ${location.errorInfo}"
+                Log.e("FootprintLoc", errText)
+                
+                // 仅针对需要用户干预的关键错误弹 Toast (7=Key鉴权失败, 12=缺权限)
+                // 忽略错误 10 (网络/GPS不稳定)，避免在弱网环境下频繁弹窗打扰用户
+                if (location.errorCode == 7 || location.errorCode == 12) {
+                    val userMsg = when (location.errorCode) {
+                        7 -> "Key鉴权失败：请检查高德后台包名是否为 com.footprint"
+                        12 -> "缺少定位权限：请在设置中授予权限"
+                        else -> ""
+                    }
+                    if (userMsg.isNotEmpty()) {
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            android.widget.Toast.makeText(applicationContext, userMsg, android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
             }
         }
     }
@@ -126,16 +168,18 @@ class LocationTrackingService : Service(), AMapLocationListener {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("正在探索世界")
-            .setContentText("已捕获点位: $count")
+            .setContentText("正在后台记录你的轨迹...")
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setOngoing(true)
             .build()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+    
     override fun onDestroy() {
         locationClient?.stopLocation()
         locationClient?.onDestroy()
+        serviceScope.cancel()
         super.onDestroy()
     }
 }
